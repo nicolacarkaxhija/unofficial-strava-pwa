@@ -1,0 +1,18 @@
+/* Tailwind v4: a single @import replaces the three v3 directives (@tailwind base/components/utilities).
+   Configuration lives in vite.config.ts via @tailwindcss/vite — no tailwind.config.js needed. */
+@import 'tailwindcss';
+
+/* Dark mode: class-based, not media-query-only.
+   We override the default `@media (prefers-color-scheme: dark)` behaviour so that
+   the user's explicit choice in Settings takes precedence over the OS setting.
+   The ThemeContext adds/removes the `dark` class on <html>; this variant rule
+   ensures `dark:` Tailwind classes respond to that class wherever it appears in
+   the DOM tree. */
+@variant dark (&:where(.dark, .dark *));
+
+/* iOS safe-area insets: ensures content clears the home indicator and notch
+   when the PWA runs in standalone mode. */
+:root {
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+}

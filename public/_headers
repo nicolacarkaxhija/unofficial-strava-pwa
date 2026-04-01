@@ -1,0 +1,15 @@
+# Cloudflare Pages security headers.
+#
+# The CSP is the technical enforcement of the product promise ("no data ever
+# leaves your device"): connect-src 'self' means the browser itself blocks any
+# attempt — ours, a dependency's, or an injected script's — to phone home.
+#
+# 'unsafe-inline' in script-src is required by the anti-FOUC theme script in
+# index.html; everything else is same-origin only. If that script ever moves
+# to a file, tighten script-src to 'self'.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()

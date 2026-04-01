@@ -1,0 +1,19 @@
+{
+  "title": "Connect your Strava data",
+  "subtitle": "Browse your full activity history — offline, private, forever",
+  "steps": {
+    "heading": "How to import your data",
+    "step1": "Open Strava → Settings → My Account",
+    "step2": "Choose \"Download or Delete Your Account\"",
+    "step3": "Under \"Download Request\", tap \"Request your archive\"",
+    "step4": "Wait for the email from Strava (can take a few hours)",
+    "step5": "Download the ZIP archive to your device",
+    "step6": "Return here and tap Import"
+  },
+  "importBtn": "Import ZIP",
+  "legal": "Your data never leaves your device. This app has no server and no analytics. Not affiliated with Strava.",
+  "eviction": {
+    "noZip": "Your data was cleared by iOS. Import your ZIP to restore it.",
+    "reparse": "Restoring your data…"
+  }
+}

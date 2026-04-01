@@ -1,0 +1,16 @@
+{
+  "title": "Trends",
+  "weeklyVolume": "Weekly volume",
+  "metric": {
+    "distance": "Distance",
+    "time": "Time",
+    "elevation": "Elevation"
+  },
+  "records": {
+    "title": "Personal records",
+    "longestDistance": "Longest distance",
+    "longestDuration": "Longest duration",
+    "mostElevation": "Most elevation"
+  },
+  "empty": "Import your Strava export to see trends"
+}

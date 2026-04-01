@@ -1,0 +1,19 @@
+{
+  "title": "Connetti i tuoi dati Strava",
+  "subtitle": "Sfoglia tutto il tuo storico attività — offline, privato, per sempre",
+  "steps": {
+    "heading": "Come importare i tuoi dati",
+    "step1": "Apri Strava → Impostazioni → Il mio account",
+    "step2": "Scegli \"Scarica o elimina il tuo account\"",
+    "step3": "In \"Richiesta di download\", premi \"Richiedi il tuo archivio\"",
+    "step4": "Attendi l'email da Strava (può richiedere alcune ore)",
+    "step5": "Scarica l'archivio ZIP sul tuo dispositivo",
+    "step6": "Torna qui e premi Importa"
+  },
+  "importBtn": "Importa ZIP",
+  "legal": "I tuoi dati non lasciano mai il dispositivo. Questa app non ha server né analytics. Non affiliata a Strava.",
+  "eviction": {
+    "noZip": "iOS ha cancellato i tuoi dati. Reimporta il ZIP per ripristinarli.",
+    "reparse": "Ripristino dati in corso…"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "activities": "Activities",
+    "trends": "Trends",
+    "settings": "Settings"
+  },
+  "back": "Back",
+  "loading": "Loading…",
+  "noData": "No activities yet",
+  "error": {
+    "generic": "Something went wrong"
+  },
+  "range": {
+    "label": "History range",
+    "30d": "30d",
+    "90d": "90d",
+    "1y": "1y",
+    "all": "All"
+  },
+  "showMore": "Show more",
+  "week": {
+    "thisWeek": "This week",
+    "distance": "Distance",
+    "time": "Time",
+    "elevation": "Elevation",
+    "activities": "Activities",
+    "vsPrevWeek": "vs previous week"
+  },
+  "update": {
+    "available": "A new version is available",
+    "reload": "Refresh"
+  }
+}

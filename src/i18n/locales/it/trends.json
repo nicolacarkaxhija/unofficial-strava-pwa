@@ -1,0 +1,16 @@
+{
+  "title": "Tendenze",
+  "weeklyVolume": "Volume settimanale",
+  "metric": {
+    "distance": "Distanza",
+    "time": "Tempo",
+    "elevation": "Dislivello"
+  },
+  "records": {
+    "title": "Record personali",
+    "longestDistance": "Distanza più lunga",
+    "longestDuration": "Durata più lunga",
+    "mostElevation": "Massimo dislivello"
+  },
+  "empty": "Importa il tuo export Strava per vedere le tendenze"
+}

@@ -1,0 +1,29 @@
+{
+  "title": "Impostazioni",
+  "data": {
+    "title": "Dati",
+    "importNew": "Importa nuovo export",
+    "lastImport": "Ultima importazione: {{date}}",
+    "clearAll": "Cancella tutti i dati",
+    "clearConfirm": "Verranno eliminati tutti i dati delle attività da questo dispositivo. Potrai reimportarli in qualsiasi momento.",
+    "cancel": "Annulla",
+    "exportJson": "Esporta dati (JSON)"
+  },
+  "appearance": {
+    "title": "Aspetto",
+    "language": "Lingua",
+    "theme": "Tema",
+    "themeSystem": "Sistema",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "units": "Unità",
+    "unitsKm": "Chilometri",
+    "unitsMi": "Miglia"
+  },
+  "about": {
+    "title": "Informazioni",
+    "version": "Versione {{version}}",
+    "legal": "Questa app elabora i dati esportati dall'export ufficiale dell'account Strava in conformità all'Art. 20 GDPR. Non è affiliata a Strava.",
+    "privacy": "Nessun dato lascia il tuo dispositivo. Non abbiamo server, database né analytics."
+  }
+}
