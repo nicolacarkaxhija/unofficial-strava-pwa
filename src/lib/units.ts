@@ -27,7 +27,9 @@ export function setStoredUnits(units: Units): void {
 }
 
 /** Sports displayed as pace (min per unit distance); everything else is speed. */
-const PACE_SPORTS = new Set(['Run', 'Walk', 'Hike'])
+// Strava's type strings include trail/virtual variants that are still
+// pace-based sports; matching on the exact set alone rendered them as km/h.
+const PACE_SPORTS = new Set(['Run', 'Walk', 'Hike', 'Trail Run', 'Virtual Run', 'Race Walk'])
 
 export function usesPace(type: string): boolean {
   return PACE_SPORTS.has(type)

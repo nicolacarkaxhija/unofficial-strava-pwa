@@ -94,17 +94,19 @@ export async function importZip(blob: Blob, onProgress: ProgressFn): Promise<Imp
 
   // Step 4: Batch-write in a single transaction.
   //
-  // Why bulkPut instead of bulkAdd?
-  //   `bulkAdd` throws if a record with the same PK already exists.
-  //   `bulkPut` is upsert — if the user re-imports the same ZIP or an updated
-  //   export, existing records are overwritten in place rather than duplicated.
-  //   This makes re-import safe and idempotent.
+  // Replace, don't merge: each import clears activities/rawFiles first.
+  //   An export IS the complete account history, so upsert-only semantics
+  //   would leave stale rows behind when re-importing a smaller export (or a
+  //   different account's). Clearing inside the transaction keeps it atomic —
+  //   a failed import rolls back to the previous data, never an empty DB.
   //
   // Why a single transaction wrapping all tables?
   //   Atomicity — either every table is updated or none is (on error, IndexedDB
   //   rolls back the whole write). The user never ends up with partial data.
   onProgress('Writing to database…', 80)
   await db.transaction('rw', [db.activities, db.rawFiles, db.meta], async () => {
+    await db.activities.clear()
+    await db.rawFiles.clear()
     await Promise.all([db.activities.bulkPut(activities), db.rawFiles.bulkPut(rawFiles)])
 
     // Store the original ZIP blob for Safari eviction recovery.

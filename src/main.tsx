@@ -7,6 +7,7 @@ import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
 import { ThemeProvider } from './theme/ThemeContext'
+import { ErrorBoundary } from './components/ui'
 import { router } from './router'
 import './styles.css'
 import { setupUpdatePrompt } from './pwa/updatePrompt'
@@ -23,9 +24,13 @@ createRoot(rootElement).render(
     <ThemeProvider>
       {/* Suspense boundary for i18n: shows nothing while locale JSON loads.
           In practice this resolves in < 50ms from the service worker cache. */}
-      <Suspense>
-        <RouterProvider router={router} />
-      </Suspense>
+      {/* Outermost catch: a render error anywhere in the route tree shows the
+          boundary's fallback instead of a blank white document. */}
+      <ErrorBoundary>
+        <Suspense>
+          <RouterProvider router={router} />
+        </Suspense>
+      </ErrorBoundary>
     </ThemeProvider>
   </StrictMode>,
 )

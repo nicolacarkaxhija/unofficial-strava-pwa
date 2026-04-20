@@ -2,10 +2,9 @@ import { useTranslation } from 'react-i18next'
 
 // ─── RangeSelector ────────────────────────────────────────────────────────────
 //
-// Segmented control for the list pages' history window. Values are row limits
-// fed straight into the useXxxDays(limit) hooks; ALL_DAYS is a sentinel large
-// enough to cover any realistic export (Oura shipped in 2015, so ~11 years —
-// 10k rows leaves headroom) while keeping the hook signature a plain number.
+// Segmented control for the history window, in CALENDAR DAYS back from today
+// (training data reads as "last 30 days", unlike the Oura sibling's row
+// counts). ALL_DAYS is a sentinel wide enough for any real archive (~27 y).
 
 export const ALL_DAYS = 10_000
 

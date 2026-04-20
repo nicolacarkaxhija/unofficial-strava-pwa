@@ -10,7 +10,7 @@ export default defineConfig({
   ...(process.env['CI'] ? { workers: 1 as const } : {}),
   reporter: process.env['CI'] ? 'github' : 'list',
   use: {
-    // Dedicated port (not Vite's default 5173, and not the Oura sibling's 5199):
+    // Dedicated port (not Vite's default 5173, and not the sibling app uses 5199):
     // with reuseExistingServer, any other Vite project running on the default
     // port would silently get tested instead of this app. --strictPort makes a
     // collision a loud failure.

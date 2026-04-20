@@ -25,8 +25,18 @@ import type { Activity } from '@/db/schema'
 // Returns null (row skipped) when the date is unparseable: an activity that
 // cannot be placed in time cannot appear in any week bucket or list.
 function toIsoDate(raw: string): string | null {
-  const ms = Date.parse(raw)
-  if (Number.isNaN(ms)) return null
+  // Strava writes "Activity Date" in UTC with no timezone marker
+  // ("Jul 4, 2025, 6:12:35 AM"). Bare Date.parse would read that as LOCAL
+  // time, shifting late-evening activities into the wrong calendar day (and
+  // ISO week) for any non-UTC user. Appending UTC pins the interpretation;
+  // strings that already carry a zone (ISO with Z/offset) are left alone.
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw.trim())
+  const ms = Date.parse(hasZone ? raw : `${raw} UTC`)
+  if (Number.isNaN(ms)) {
+    // Fallback for vintages Date.parse can't handle with the UTC suffix.
+    const local = Date.parse(raw)
+    return Number.isNaN(local) ? null : new Date(local).toISOString()
+  }
   return new Date(ms).toISOString()
 }
 

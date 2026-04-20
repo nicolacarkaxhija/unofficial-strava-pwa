@@ -26,7 +26,7 @@ export default defineConfig({
         description:
           'View your Strava activity history offline and privately — powered by your GDPR data export',
         theme_color: '#f8fafc',
-        background_color: '#0f172a',
+        background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait-primary',
         scope: '/',

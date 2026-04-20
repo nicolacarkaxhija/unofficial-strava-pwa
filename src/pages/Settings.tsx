@@ -70,8 +70,9 @@ export default function Settings() {
     await db.transaction('rw', db.tables, async () => {
       await Promise.all(db.tables.map((table) => table.clear()))
     })
-    // Dispatch so the onboarding gate re-evaluates without a page reload.
-    window.dispatchEvent(new CustomEvent('strava:eviction', { detail: 'no-zip' }))
+    // No eviction event here: useHasData is reactive and re-gates on its own,
+    // and the eviction banner ("cleared by iOS") would be wrong for a
+    // deliberate clear anyway.
     setClearing(false)
     setConfirmClear(false)
     // The onboarding gate only replaces the Dashboard route, so send the user

@@ -7,11 +7,15 @@
     <!-- Anti-FOUC: apply dark class synchronously before React mounts.
          Must run inline (not deferred) so the first paint already has the
          correct background colour. Default is light; dark only if the user
-         explicitly chose it and it is stored in localStorage. -->
+         explicitly chose it, or chose System and the OS is dark. -->
     <script>
       ;(function () {
         var t = localStorage.getItem('theme')
-        if (t === 'dark') document.documentElement.classList.add('dark')
+        if (
+          t === 'dark' ||
+          (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+        )
+          document.documentElement.classList.add('dark')
       })()
     </script>
     <!-- iOS PWA meta tags: required for standalone mode on Safari -->
