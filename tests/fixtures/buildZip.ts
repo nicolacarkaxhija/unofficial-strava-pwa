@@ -14,9 +14,11 @@
 //   account-export generates (activities.csv at the root + raw files under
 //   activities/), then let the import pipeline process it without stubbing.
 
+import { gzipSync } from 'node:zlib'
 import Papa from 'papaparse'
 import JSZip from 'jszip'
 import { makeActivityRow, type RawActivityRow } from './csvRows'
+import { buildFitDummy, buildGpx, buildTcx, cityLoopPoints } from './trackFiles'
 
 export interface FixtureZipOptions {
   /** Number of activities to generate. Default: 60. */
@@ -27,8 +29,18 @@ export interface FixtureZipOptions {
    * so week-over-week deltas exist.
    */
   spanDays?: number
-  /** How many of the activities get a dummy .gpx raw file in the ZIP. Default: 3. */
+  /**
+   * How many of the activities get a REAL .gpx raw file (a small Milan city
+   * loop, parsed by the app's actual DOMParser path). The FIRST one carries
+   * gpxtpx:hr heart-rate extensions, the rest are HR-free. Default: 3.
+   */
   gpxFiles?: number
+  /** Activities (after the gpx ones) that get a real .tcx file with HR. Default: 0. */
+  tcxFiles?: number
+  /** Activities (after tcx) that get a gzipped .gpx.gz file. Default: 0. */
+  gzGpxFiles?: number
+  /** Activities (after gz) that get a dummy .fit file (unsupported path). Default: 0. */
+  fitFiles?: number
   /** Extra raw rows appended verbatim (edge-case injection). */
   extraRows?: RawActivityRow[]
 }
@@ -54,7 +66,25 @@ function stravaDate(d: Date): string {
 
 const SPORTS = ['Run', 'Ride', 'Walk', 'Swim'] as const
 
-function buildRows(count: number, spanDays: number, gpxFiles: number): RawActivityRow[] {
+// Sequential file-type assignment: activities [0, gpx) get .gpx, then .tcx,
+// then .gpx.gz, then .fit. Deterministic so E2E specs can address "the tcx
+// activity" by index without reading app state.
+interface FileCounts {
+  gpx: number
+  tcx: number
+  gz: number
+  fit: number
+}
+
+function fileRefFor(i: number, id: string, c: FileCounts): string {
+  if (i < c.gpx) return `activities/${id}.gpx`
+  if (i < c.gpx + c.tcx) return `activities/${id}.tcx`
+  if (i < c.gpx + c.tcx + c.gz) return `activities/${id}.gpx.gz`
+  if (i < c.gpx + c.tcx + c.gz + c.fit) return `activities/${id}.fit`
+  return ''
+}
+
+function buildRows(count: number, spanDays: number, files: FileCounts): RawActivityRow[] {
   const rows: RawActivityRow[] = []
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
@@ -82,15 +112,31 @@ function buildRows(count: number, spanDays: number, gpxFiles: number): RawActivi
         ...(sport === 'Swim'
           ? { 'Elevation Gain': '', 'Average Heart Rate': '', 'Max Heart Rate': '' }
           : {}),
-        Filename: i < gpxFiles ? `activities/${id}.gpx` : '',
+        Filename: fileRefFor(i, id, files),
       }),
     )
   }
   return rows
 }
 
-const DUMMY_GPX =
-  '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="fixture"><trk><name>fixture</name></trk></gpx>\n'
+// ─── Raw file content ─────────────────────────────────────────────────────────
+//
+// Real parseable documents, generated once and reused for every referenced
+// file: the tests care about the parse path, not about tracks differing
+// between activities. The first .gpx per zip carries HR extensions so exactly
+// one fixture activity exercises the gpxtpx:hr path.
+
+const GPX_WITH_HR = buildGpx(cityLoopPoints({ withHr: true }))
+const GPX_NO_HR = buildGpx(cityLoopPoints())
+const TCX_WITH_HR = buildTcx(cityLoopPoints({ withHr: true }))
+const GZ_GPX = gzipSync(GPX_NO_HR)
+
+function rawFileContent(fileRef: string, isFirstGpx: boolean): string | Uint8Array {
+  if (fileRef.endsWith('.gpx.gz')) return GZ_GPX
+  if (fileRef.endsWith('.gpx')) return isFirstGpx ? GPX_WITH_HR : GPX_NO_HR
+  if (fileRef.endsWith('.tcx')) return TCX_WITH_HR
+  return buildFitDummy() // .fit
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -103,20 +149,37 @@ const DUMMY_GPX =
  * .gpx raw files under activities/ referenced by the CSV's Filename column.
  */
 export async function buildFixtureZip(options: FixtureZipOptions = {}): Promise<Blob> {
-  const { activities = 60, spanDays = 90, gpxFiles = 3, extraRows = [] } = options
+  const {
+    activities = 60,
+    spanDays = 90,
+    gpxFiles = 3,
+    tcxFiles = 0,
+    gzGpxFiles = 0,
+    fitFiles = 0,
+    extraRows = [],
+  } = options
 
-  const generated = buildRows(activities, spanDays, gpxFiles)
+  const generated = buildRows(activities, spanDays, {
+    gpx: gpxFiles,
+    tcx: tcxFiles,
+    gz: gzGpxFiles,
+    fit: fitFiles,
+  })
   const rows = [...generated, ...extraRows]
 
   const zip = new JSZip()
   zip.file('activities.csv', Papa.unparse(rows))
 
-  // Raw files referenced from the CSV — stored, never parsed, in v1.
+  // Raw files referenced from the CSV — real parseable tracks since phase 2.
   // Only generated rows get a real file: extraRows are edge-case injections
   // and may deliberately reference files the ZIP lacks.
+  let firstGpx = true
   for (const row of generated) {
     const fileRef = row['Filename']
-    if (fileRef) zip.file(fileRef, DUMMY_GPX)
+    if (!fileRef) continue
+    const isGpx = fileRef.endsWith('.gpx')
+    zip.file(fileRef, rawFileContent(fileRef, isGpx && firstGpx))
+    if (isGpx) firstGpx = false
   }
 
   // JSZip generates a real DEFLATE-compressed ZIP binary.
