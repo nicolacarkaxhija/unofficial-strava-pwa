@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { LoadingSkeleton, RangeSelector, SportIcon } from '@/components/ui'
 import { useAllActivities } from '@/db/hooks'
@@ -19,9 +20,8 @@ import type { Units } from '@/lib/units'
 // Display is additionally paginated with "Show more" so "All" on a decade-long
 // export doesn't render thousands of DOM rows at once.
 //
-// No detail page in v1: a row already shows every field the CSV gives us that
-// is worth reading at a glance; a detail view earns its place in phase 2 when
-// parsed GPX tracks give it a map to show.
+// Each row links to /activities/$id (phase 2): the row shows the at-a-glance
+// fields; the detail page adds the full stat grid and the parsed-track charts.
 
 // Rows rendered before a "Show more" click — comfortably above the 1y
 // window for a daily athlete so pagination only ever appears for "All".
@@ -163,8 +163,13 @@ function SportChip({
 }
 
 function ActivityRow({ activity, units }: { activity: Activity; units: Units }) {
+  // The whole row is one Link (phase 2 detail page) — a full-row tap target
+  // beats a small chevron on mobile, and keeping data-testid="activity-item"
+  // on the link preserves every existing E2E selector.
   return (
-    <div
+    <Link
+      to="/activities/$id"
+      params={{ id: activity.id }}
       className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-slate-800"
       data-testid="activity-item"
     >
@@ -191,6 +196,6 @@ function ActivityRow({ activity, units }: { activity: Activity; units: Units }) 
           {formatPaceOrSpeed(activity.type, activity.distanceKm, activity.movingTimeSec, units)}
         </p>
       </div>
-    </div>
+    </Link>
   )
 }

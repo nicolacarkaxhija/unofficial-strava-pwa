@@ -8,6 +8,7 @@
   "back": "Indietro",
   "loading": "Caricamento…",
   "noData": "Nessuna attività",
+  "notFound": "Nessun risultato per questa pagina",
   "error": {
     "generic": "Qualcosa è andato storto"
   },

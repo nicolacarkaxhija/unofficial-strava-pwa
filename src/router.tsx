@@ -5,14 +5,16 @@ import App from './App'
 
 // ─── Route tree ───────────────────────────────────────────────────────────────
 //
-// Four flat tabs, no params: v1 has no detail routes (a detail page earns its
-// place in phase 2 when parsed GPX tracks give it a map to render). TanStack
-// Router is kept over a hand-rolled switch for typed Links and because phase 2
-// WILL add /activities/$id — swapping routers later would touch every page.
+// Four flat tabs plus /activities/$id. The detail route is a ROOT-level
+// SIBLING of /activities, not its child: ActivityList renders no <Outlet/>,
+// so a child route would silently render nothing — exactly the trap that
+// shipped as a bug in the sibling template. Flat siblings keep every page
+// responsible only for itself.
 
 // ─── Page components (lazy-loaded for code splitting) ─────────────────────────
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const ActivityList = lazy(() => import('./pages/activities/ActivityList'))
+const ActivityDetail = lazy(() => import('./pages/activities/ActivityDetail'))
 const Trends = lazy(() => import('./pages/trends/Trends'))
 const Settings = lazy(() => import('./pages/Settings'))
 
@@ -40,6 +42,22 @@ const activitiesRoute = createRoute({
   component: ActivityList,
 })
 
+const activityDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/activities/$id',
+  // Param validation only asserts "id is a non-empty string" — whether it
+  // exists in the DB is the page's concern (useActivity resolves null and the
+  // page renders the NoDataState, per the null-vs-undefined hook contract).
+  params: {
+    parse: (params) => {
+      if (!params.id) throw new Error('Activity id must be a non-empty string')
+      return { id: params.id }
+    },
+    stringify: (params) => ({ id: params.id }),
+  },
+  component: ActivityDetail,
+})
+
 const trendsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/trends',
@@ -57,6 +75,7 @@ const settingsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   activitiesRoute,
+  activityDetailRoute,
   trendsRoute,
   settingsRoute,
 ])

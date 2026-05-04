@@ -7,4 +7,5 @@
 // this barrel exists solely for ergonomic imports in page components.
 
 export { useActivities, useAllActivities } from './useActivities'
+export { useActivity, useRawFile } from './useActivityDetail'
 export { useImportStats, useHasData } from './useMeta'

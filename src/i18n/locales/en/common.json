@@ -8,6 +8,7 @@
   "back": "Back",
   "loading": "Loading…",
   "noData": "No activities yet",
+  "notFound": "Nothing found for this page",
   "error": {
     "generic": "Something went wrong"
   },

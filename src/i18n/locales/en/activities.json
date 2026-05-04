@@ -2,5 +2,26 @@
   "title": "Activities",
   "recent": "Recent activities",
   "filterAll": "All sports",
-  "empty": "No activities in this range"
+  "empty": "No activities in this range",
+  "detail": {
+    "stats": {
+      "distance": "Distance",
+      "movingTime": "Moving time",
+      "elapsedTime": "Elapsed time",
+      "pace": "Pace",
+      "speed": "Speed",
+      "elevationGain": "Elevation gain",
+      "avgHr": "Avg heart rate",
+      "maxHr": "Max heart rate",
+      "calories": "Calories",
+      "avgWatts": "Avg power"
+    },
+    "route": "Route",
+    "elevationProfile": "Elevation",
+    "heartRate": "Heart rate",
+    "fitNotSupported": "This activity was recorded as a FIT file, which is not yet supported for track display.",
+    "gzNotSupported": "This browser cannot decompress the stored track file.",
+    "trackError": "The track file for this activity could not be read.",
+    "trackEmpty": "The track file contains no GPS points."
+  }
 }
