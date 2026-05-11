@@ -69,7 +69,13 @@ export function ElevationProfile({
       />
 
       {/* Baseline */}
-      <line x1="0" y1={chartH} x2={W} y2={chartH} className="stroke-slate-200 dark:stroke-slate-700" />
+      <line
+        x1="0"
+        y1={chartH}
+        x2={W}
+        y2={chartH}
+        className="stroke-slate-200 dark:stroke-slate-700"
+      />
 
       {/* Max-elevation reference, top-left — mirrors WeeklyBarChart's single
           reference point over a full axis */}
@@ -81,7 +87,12 @@ export function ElevationProfile({
       <text x="2" y={H - 4} className="fill-slate-400 text-[9px] dark:fill-slate-500">
         0
       </text>
-      <text x={W - 2} y={H - 4} textAnchor="end" className="fill-slate-400 text-[9px] dark:fill-slate-500">
+      <text
+        x={W - 2}
+        y={H - 4}
+        textAnchor="end"
+        className="fill-slate-400 text-[9px] dark:fill-slate-500"
+      >
         {formatDistance(maxKm)}
       </text>
     </svg>

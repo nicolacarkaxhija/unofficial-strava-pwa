@@ -24,7 +24,10 @@ interface HeartRateChartProps {
   formatDuration: (seconds: number) => string
 }
 
-export function HeartRateChart({ points, formatDuration }: HeartRateChartProps): ReactElement | null {
+export function HeartRateChart({
+  points,
+  formatDuration,
+}: HeartRateChartProps): ReactElement | null {
   const startTime = points.find((p) => p.time !== undefined)?.time
   const samples: Array<{ x: number; hr: number }> = []
   points.forEach((p, i) => {
@@ -70,7 +73,13 @@ export function HeartRateChart({ points, formatDuration }: HeartRateChartProps):
         className="stroke-rose-500 dark:stroke-rose-400"
       />
 
-      <line x1="0" y1={chartH} x2={W} y2={chartH} className="stroke-slate-200 dark:stroke-slate-700" />
+      <line
+        x1="0"
+        y1={chartH}
+        x2={W}
+        y2={chartH}
+        className="stroke-slate-200 dark:stroke-slate-700"
+      />
 
       {/* Max/min bpm reference labels */}
       <text x="2" y="10" className="fill-slate-400 text-[9px] dark:fill-slate-500">
@@ -82,7 +91,12 @@ export function HeartRateChart({ points, formatDuration }: HeartRateChartProps):
 
       {/* Elapsed-time span label only when real timestamps back the axis */}
       {hasTime && (
-        <text x={W - 2} y={H - 4} textAnchor="end" className="fill-slate-400 text-[9px] dark:fill-slate-500">
+        <text
+          x={W - 2}
+          y={H - 4}
+          textAnchor="end"
+          className="fill-slate-400 text-[9px] dark:fill-slate-500"
+        >
           {formatDuration(maxX)}
         </text>
       )}

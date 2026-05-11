@@ -26,8 +26,7 @@ export function haversineKm(a: LatLon, b: LatLon): number {
   const dLon = toRad(b.lon - a.lon)
   const sinLat = Math.sin(dLat / 2)
   const sinLon = Math.sin(dLon / 2)
-  const h =
-    sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLon * sinLon
+  const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLon * sinLon
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
@@ -88,10 +87,7 @@ export function projectTrack(
   // Guard the degenerate cases (single point, perfectly straight N–S or E–W
   // line): a zero span would divide by zero, so fall back to a unit span that
   // centres the track instead.
-  const scale = Math.min(
-    innerW / Math.max(spanX, 1e-9),
-    innerH / Math.max(spanY, 1e-9),
-  )
+  const scale = Math.min(innerW / Math.max(spanX, 1e-9), innerH / Math.max(spanY, 1e-9))
 
   // Centre the fitted track inside the box on both axes.
   const offsetX = (width - spanX * scale) / 2

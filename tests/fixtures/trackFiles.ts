@@ -107,9 +107,7 @@ export function buildTcx(points: FixtureTrackPoint[]): string {
   const trackpoints = points
     .map((p) => {
       const hr =
-        p.hr !== undefined
-          ? `<HeartRateBpm><Value>${String(p.hr)}</Value></HeartRateBpm>`
-          : ''
+        p.hr !== undefined ? `<HeartRateBpm><Value>${String(p.hr)}</Value></HeartRateBpm>` : ''
       return `<Trackpoint><Time>${p.time}</Time><Position><LatitudeDegrees>${String(p.lat)}</LatitudeDegrees><LongitudeDegrees>${String(p.lon)}</LongitudeDegrees></Position><AltitudeMeters>${p.ele.toFixed(1)}</AltitudeMeters>${hr}</Trackpoint>`
     })
     .join('\n          ')

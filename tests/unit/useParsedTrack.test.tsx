@@ -50,10 +50,9 @@ describe('useParsedTrack', () => {
   it('re-parses when the raw file changes (navigation between details)', async () => {
     const gpx = makeRawFile('activities/1.gpx', buildGpx(cityLoopPoints()))
     const fit = makeRawFile('activities/2.fit', 'binary-ish')
-    const { result, rerender } = renderHook(
-      ({ file }: { file: RawFile }) => useParsedTrack(file),
-      { initialProps: { file: gpx } },
-    )
+    const { result, rerender } = renderHook(({ file }: { file: RawFile }) => useParsedTrack(file), {
+      initialProps: { file: gpx },
+    })
     await waitFor(() => {
       expect(result.current?.kind).toBe('track')
     })

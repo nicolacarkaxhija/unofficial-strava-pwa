@@ -54,7 +54,13 @@ export function RouteMap({ points, distanceLabel }: RouteMapProps): ReactElement
           landmarks a tile-free map can offer. Drawn after the line so loops
           (start ≈ end) still show both dots. */}
       {start && (
-        <circle cx={start.x} cy={start.y} r={4} className="fill-green-500" data-testid="route-start" />
+        <circle
+          cx={start.x}
+          cy={start.y}
+          r={4}
+          className="fill-green-500"
+          data-testid="route-start"
+        />
       )}
       {end && (
         <circle cx={end.x} cy={end.y} r={4} className="fill-red-500" data-testid="route-end" />
