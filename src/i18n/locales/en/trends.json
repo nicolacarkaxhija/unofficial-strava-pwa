@@ -1,6 +1,9 @@
 {
   "title": "Trends",
   "weeklyVolume": "Weekly volume",
+  "sportFilterLabel": "Sport",
+  "metricSwitcherLabel": "Chart metric",
+  "chartLabel": "Weekly {{metric}} bar chart, {{weeks}} weeks, peak {{peak}}",
   "metric": {
     "distance": "Distance",
     "time": "Time",

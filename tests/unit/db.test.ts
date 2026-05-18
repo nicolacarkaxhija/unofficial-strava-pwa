@@ -7,7 +7,8 @@ import type { Activity, RawFile } from '@/db/schema'
 // These verify the behaviours the app RELIES on, against fake-indexeddb:
 //   • bulkPut is upsert (re-import must not duplicate)
 //   • orderBy('date') gives chronological order (ISO strings sort correctly)
-//   • the type index answers the sport filter
+//   • sport filtering works in JS over a full read (the type index was
+//     dropped in schema v2 — no app query ever used it)
 //   • rawFiles round-trips a Blob keyed by filename
 
 function act(id: string, date: string, type = 'Run'): Activity {
@@ -54,13 +55,15 @@ describe('activities table', () => {
     expect(rows.map((r) => r.id)).toEqual(['new', 'mid', 'old'])
   })
 
-  it('type index supports the sport filter query', async () => {
+  it('sport filtering works JS-side after a full read (no type index in v2)', async () => {
     await db.activities.bulkPut([
       act('1', '2026-01-01T08:00:00.000Z', 'Run'),
       act('2', '2026-01-02T08:00:00.000Z', 'Ride'),
       act('3', '2026-01-03T08:00:00.000Z', 'Run'),
     ])
-    const runs = await db.activities.where('type').equals('Run').toArray()
+    // Mirrors how every page filters: toArray() then Array.filter — matches
+    // the v2 schema decision to drop the never-queried `type` index.
+    const runs = (await db.activities.toArray()).filter((a) => a.type === 'Run')
     expect(runs).toHaveLength(2)
   })
 })

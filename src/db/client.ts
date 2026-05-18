@@ -38,6 +38,15 @@ class StravaPWADatabase extends Dexie {
       rawFiles: 'id, activityId',
       meta: 'key',
     })
+
+    // v2: drop the `type` index. Every sport filter in the app reads the full
+    // table via useAllActivities() and filters in JS (the chips need a full
+    // type census anyway), so the index was pure write/storage overhead that
+    // was never queried. Dexie deletes an index when it disappears from the
+    // stores() spec of a newer version — data is untouched.
+    this.version(2).stores({
+      activities: 'id, date',
+    })
   }
 }
 

@@ -13,7 +13,6 @@
   "importBtn": "Importa ZIP",
   "legal": "I tuoi dati non lasciano mai il dispositivo. Questa app non ha server né analytics. Non affiliata a Strava.",
   "eviction": {
-    "noZip": "iOS ha cancellato i tuoi dati. Reimporta il ZIP per ripristinarli.",
-    "reparse": "Ripristino dati in corso…"
+    "noZip": "iOS ha cancellato i tuoi dati. Reimporta il ZIP per ripristinarli."
   }
 }

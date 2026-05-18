@@ -6,12 +6,7 @@
     "settings": "Impostazioni"
   },
   "back": "Indietro",
-  "loading": "Caricamento…",
-  "noData": "Nessuna attività",
   "notFound": "Nessun risultato per questa pagina",
-  "error": {
-    "generic": "Qualcosa è andato storto"
-  },
   "range": {
     "label": "Intervallo storico",
     "30d": "30g",

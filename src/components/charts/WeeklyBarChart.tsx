@@ -17,6 +17,12 @@ interface WeeklyBarChartProps {
   metric: 'distanceKm' | 'movingTimeSec' | 'elevationGainM'
   /** Value formatter for the max-value label (units live with the caller). */
   formatValue: (value: number) => string
+  /**
+   * Accessible description of the chart. Passed in (not translated here) so
+   * the caller — who owns metric names, units and i18n context — can produce
+   * a data-bearing sentence instead of a generic hardcoded English label.
+   */
+  ariaLabel: string
 }
 
 const W = 320
@@ -27,6 +33,7 @@ export function WeeklyBarChart({
   buckets,
   metric,
   formatValue,
+  ariaLabel,
 }: WeeklyBarChartProps): ReactElement {
   const max = Math.max(...buckets.map((b) => b[metric]), 0)
   const barAreaH = H - LABEL_H
@@ -42,7 +49,7 @@ export function WeeklyBarChart({
       viewBox={`0 0 ${String(W)} ${String(H)}`}
       className="w-full"
       role="img"
-      aria-label="Weekly volume bar chart"
+      aria-label={ariaLabel}
       data-testid="weekly-bar-chart"
     >
       {buckets.map((b, i) => {

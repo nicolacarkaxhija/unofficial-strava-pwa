@@ -1,6 +1,9 @@
 {
   "title": "Tendenze",
   "weeklyVolume": "Volume settimanale",
+  "sportFilterLabel": "Sport",
+  "metricSwitcherLabel": "Metrica del grafico",
+  "chartLabel": "Grafico a barre settimanale ({{metric}}), {{weeks}} settimane, picco {{peak}}",
   "metric": {
     "distance": "Distanza",
     "time": "Tempo",
