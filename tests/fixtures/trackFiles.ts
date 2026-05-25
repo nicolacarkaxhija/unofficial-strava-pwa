@@ -128,13 +128,98 @@ export function buildTcx(points: FixtureTrackPoint[]): string {
 `
 }
 
-// ─── FIT dummy ────────────────────────────────────────────────────────────────
+// ─── FIT ──────────────────────────────────────────────────────────────────────
+//
+// A REAL, minimal FIT binary hand-built to the FIT Protocol spec — not a stub:
+// 14-byte header (".FIT" signature + header CRC), one little-endian definition
+// message for the `record` global message (num 20) with timestamp / lat / lon /
+// altitude / heart-rate fields, one data message per point, and the trailing
+// file CRC-16. @garmin/fitsdk decodes it exactly like a watch recording, so
+// tests exercise the true decode path (CRC checks, semicircles, alt scaling).
 
-/**
- * A few bytes with FIT's ".FIT" signature at offset 8. The app never parses
- * FIT — this exists purely to exercise the "unsupported" path with a payload
- * that is at least shaped like the real thing's header.
- */
-export function buildFitDummy(): Uint8Array {
-  return new Uint8Array([14, 16, 92, 8, 0, 0, 0, 0, 0x2e, 0x46, 0x49, 0x54, 0, 0])
+/** CRC-16 as defined in the FIT Protocol (nibble-table variant from the spec). */
+function fitCrc16(bytes: Uint8Array): number {
+  const table = [
+    0x0000, 0xcc01, 0xd801, 0x1400, 0xf001, 0x3c00, 0x2800, 0xe401, 0xa001, 0x6c00, 0x7800,
+    0xb401, 0x5000, 0x9c01, 0x8801, 0x4400,
+  ]
+  let crc = 0
+  for (const byte of bytes) {
+    let tmp = table[crc & 0xf] ?? 0
+    crc = (crc >> 4) & 0x0fff
+    crc = crc ^ tmp ^ (table[byte & 0xf] ?? 0)
+    tmp = table[crc & 0xf] ?? 0
+    crc = (crc >> 4) & 0x0fff
+    crc = crc ^ tmp ^ (table[(byte >> 4) & 0xf] ?? 0)
+  }
+  return crc
+}
+
+// FIT timestamps count seconds from the FIT epoch, 1989-12-31T00:00:00Z.
+const FIT_EPOCH_S = Date.UTC(1989, 11, 31) / 1000
+// FIT's sint32 invalid sentinel — what a device writes on GPS dropout.
+const FIT_SINT32_INVALID = 0x7fffffff
+
+export interface BuildFitOptions {
+  /** Append a record whose position is the invalid sentinel (GPS dropout). */
+  withInvalidPositionRecord?: boolean
+}
+
+/** Build valid FIT bytes containing one `record` message per point. */
+export function buildFit(points: FixtureTrackPoint[], options: BuildFitOptions = {}): Uint8Array {
+  const RECORD_SIZE = 1 + 4 + 4 + 4 + 2 + 1 // header + ts + lat + lon + alt + hr
+  const extra = options.withInvalidPositionRecord ? 1 : 0
+
+  // Definition message: local type 0 → global message 20 (record), LE.
+  // Field triplets after the count are (field def number, size, base type).
+  // prettier-ignore
+  const definition = Uint8Array.from([
+    0x40, 0x00, 0x00, 20, 0x00, 5,
+    253, 4, 0x86, // timestamp: uint32
+    0, 4, 0x85,   // position_lat: sint32 (semicircles)
+    1, 4, 0x85,   // position_long: sint32 (semicircles)
+    2, 2, 0x84,   // altitude: uint16, scale 5 offset 500 (per FIT profile)
+    3, 1, 0x02,   // heart_rate: uint8
+  ])
+
+  const data = new Uint8Array(definition.length + (points.length + extra) * RECORD_SIZE)
+  data.set(definition, 0)
+  const view = new DataView(data.buffer)
+  let o = definition.length
+  const writeRecord = (lat: number, lon: number, ele: number, timeMs: number, hr?: number) => {
+    view.setUint8(o, 0x00) // data message, local type 0
+    view.setUint32(o + 1, Math.round(timeMs / 1000 - FIT_EPOCH_S), true)
+    view.setInt32(o + 5, lat, true)
+    view.setInt32(o + 9, lon, true)
+    // Profile altitude encoding: stored = (metres + 500) × 5.
+    view.setUint16(o + 13, Math.round((ele + 500) * 5), true)
+    view.setUint8(o + 15, hr ?? 0xff) // 0xff = uint8 invalid → "no HR"
+    o += RECORD_SIZE
+  }
+  const toSemicircles = (deg: number) => Math.round((deg * 2 ** 31) / 180)
+  for (const p of points) {
+    writeRecord(toSemicircles(p.lat), toSemicircles(p.lon), p.ele, Date.parse(p.time), p.hr)
+  }
+  if (options.withInvalidPositionRecord) {
+    writeRecord(FIT_SINT32_INVALID, FIT_SINT32_INVALID, 0, Date.parse('2026-01-15T08:00:00Z'))
+  }
+
+  // 14-byte header: size, protocol 1.0, profile version, data size, ".FIT", CRC.
+  const header = new Uint8Array(14)
+  const hv = new DataView(header.buffer)
+  hv.setUint8(0, 14)
+  hv.setUint8(1, 0x10)
+  hv.setUint16(2, 2120, true) // profile version — informational only
+  hv.setUint32(4, data.length, true)
+  header.set([0x2e, 0x46, 0x49, 0x54], 8) // ".FIT"
+  hv.setUint16(12, fitCrc16(header.subarray(0, 12)), true)
+
+  const withoutCrc = new Uint8Array(header.length + data.length)
+  withoutCrc.set(header, 0)
+  withoutCrc.set(data, header.length)
+
+  const out = new Uint8Array(withoutCrc.length + 2)
+  out.set(withoutCrc, 0)
+  new DataView(out.buffer).setUint16(withoutCrc.length, fitCrc16(withoutCrc), true)
+  return out
 }

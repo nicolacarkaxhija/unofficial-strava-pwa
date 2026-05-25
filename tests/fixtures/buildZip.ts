@@ -18,7 +18,7 @@ import { gzipSync } from 'node:zlib'
 import Papa from 'papaparse'
 import JSZip from 'jszip'
 import { makeActivityRow, type RawActivityRow } from './csvRows'
-import { buildFitDummy, buildGpx, buildTcx, cityLoopPoints } from './trackFiles'
+import { buildFit, buildGpx, buildTcx, cityLoopPoints } from './trackFiles'
 
 export interface FixtureZipOptions {
   /** Number of activities to generate. Default: 60. */
@@ -39,7 +39,7 @@ export interface FixtureZipOptions {
   tcxFiles?: number
   /** Activities (after tcx) that get a gzipped .gpx.gz file. Default: 0. */
   gzGpxFiles?: number
-  /** Activities (after gz) that get a dummy .fit file (unsupported path). Default: 0. */
+  /** Activities (after gz) that get a real binary .fit file. Default: 0. */
   fitFiles?: number
   /** Extra raw rows appended verbatim (edge-case injection). */
   extraRows?: RawActivityRow[]
@@ -130,12 +130,13 @@ const GPX_WITH_HR = buildGpx(cityLoopPoints({ withHr: true }))
 const GPX_NO_HR = buildGpx(cityLoopPoints())
 const TCX_WITH_HR = buildTcx(cityLoopPoints({ withHr: true }))
 const GZ_GPX = gzipSync(GPX_NO_HR)
+const FIT_WITH_HR = buildFit(cityLoopPoints({ withHr: true }))
 
 function rawFileContent(fileRef: string, isFirstGpx: boolean): string | Uint8Array {
   if (fileRef.endsWith('.gpx.gz')) return GZ_GPX
   if (fileRef.endsWith('.gpx')) return isFirstGpx ? GPX_WITH_HR : GPX_NO_HR
   if (fileRef.endsWith('.tcx')) return TCX_WITH_HR
-  return buildFitDummy() // .fit
+  return FIT_WITH_HR // .fit
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

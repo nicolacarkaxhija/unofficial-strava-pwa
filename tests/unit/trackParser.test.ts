@@ -2,11 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { gzipSync } from 'node:zlib'
 import {
   detectTrackFormat,
+  parseFit,
   parseGpx,
   parseTcx,
   parseTrackBlob,
 } from '@/connectors/strava/trackParser'
-import { buildGpx, buildTcx, cityLoopPoints } from '../fixtures/trackFiles'
+import { buildFit, buildGpx, buildTcx, cityLoopPoints } from '../fixtures/trackFiles'
+
+// Uint8Array → standalone ArrayBuffer (a subarray's .buffer would leak offsets).
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.slice().buffer
+}
 
 // ─── Format detection ─────────────────────────────────────────────────────────
 
@@ -123,6 +129,51 @@ describe('parseTcx', () => {
   })
 })
 
+// ─── FIT ──────────────────────────────────────────────────────────────────────
+
+describe('parseFit', () => {
+  it('decodes records: semicircle→degree positions, altitude, time, hr', async () => {
+    const points = cityLoopPoints({ withHr: true })
+    const result = await parseFit(toArrayBuffer(buildFit(points)))
+    expect(result.kind).toBe('track')
+    if (result.kind !== 'track') return
+    const { track } = result
+    expect(track.points.length).toBe(points.length)
+    const first = track.points[0]
+    // Semicircle quantisation is ~1e-7 degrees — well inside 4 decimals.
+    expect(first?.lat).toBeCloseTo(45.472, 4)
+    expect(first?.lon).toBeCloseTo(9.172, 4)
+    // Altitude round-trips through the (m + 500) × 5 profile encoding: 0.2 m steps.
+    expect(first?.ele).toBeCloseTo(points[0]?.ele ?? 0, 0)
+    // FIT timestamps are whole seconds since the FIT epoch.
+    expect(first?.time).toBe(Date.parse('2026-01-15T07:30:00Z'))
+    expect(first?.hr).toBe(120)
+    expect(track.totalDistanceKm).toBeGreaterThan(1.5)
+  })
+
+  it('omits hr when the record carries the uint8 invalid value', async () => {
+    const result = await parseFit(toArrayBuffer(buildFit(cityLoopPoints())))
+    expect(result.kind).toBe('track')
+    if (result.kind !== 'track') return
+    expect(result.track.points.every((p) => p.hr === undefined)).toBe(true)
+  })
+
+  it('skips records whose position is the sint32 invalid sentinel', async () => {
+    const points = cityLoopPoints()
+    const bytes = buildFit(points, { withInvalidPositionRecord: true })
+    const result = await parseFit(toArrayBuffer(bytes))
+    expect(result.kind).toBe('track')
+    if (result.kind !== 'track') return
+    expect(result.track.points.length).toBe(points.length) // dropout skipped
+  })
+
+  it('returns error for garbage bytes and for a truncated FIT file', async () => {
+    expect((await parseFit(toArrayBuffer(new Uint8Array([1, 2, 3, 4])))).kind).toBe('error')
+    const truncated = buildFit(cityLoopPoints()).slice(0, 40)
+    expect((await parseFit(toArrayBuffer(truncated))).kind).toBe('error')
+  })
+})
+
 // ─── parseTrackBlob (entry point) ─────────────────────────────────────────────
 
 describe('parseTrackBlob', () => {
@@ -147,10 +198,24 @@ describe('parseTrackBlob', () => {
     expect(result.kind).toBe('error')
   })
 
-  it('routes .fit and .fit.gz to unsupported-fit without touching the blob', async () => {
+  it('parses a plain .fit blob end to end', async () => {
+    const blob = new Blob([toArrayBuffer(buildFit(cityLoopPoints()))])
+    const result = await parseTrackBlob('activities/1.fit', blob)
+    expect(result.kind).toBe('track')
+  })
+
+  it('decompresses and parses a .fit.gz blob', async () => {
+    const gz = gzipSync(buildFit(cityLoopPoints({ withHr: true })))
+    const blob = new Blob([new Uint8Array(gz)])
+    const result = await parseTrackBlob('activities/1.fit.gz', blob)
+    expect(result.kind).toBe('track')
+    if (result.kind !== 'track') return
+    expect(result.track.points[0]?.hr).toBe(120)
+  })
+
+  it('returns error (not a crash) for non-FIT bytes behind a .fit name', async () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])])
-    expect((await parseTrackBlob('activities/1.fit', blob)).kind).toBe('unsupported-fit')
-    expect((await parseTrackBlob('activities/1.fit.gz', blob)).kind).toBe('unsupported-fit')
+    expect((await parseTrackBlob('activities/1.fit', blob)).kind).toBe('error')
   })
 
   it('flags unknown extensions as unsupported-format', async () => {

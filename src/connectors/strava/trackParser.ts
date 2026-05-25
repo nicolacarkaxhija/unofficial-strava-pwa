@@ -10,11 +10,13 @@
 // and lifecycle cost for no perceptible gain (the import worker exists because
 // it processes the WHOLE zip; this parses one file).
 //
-// FIT is intentionally NOT parsed: it is a binary format that would require a
-// dependency (or a hand-rolled binary reader) for a file type most exports
-// don't even contain unless the athlete records on a Garmin. Until a user asks,
-// the page shows an i18n'd "not yet supported" note instead. (Documented
-// decision — revisit when requested.)
+// FIT is parsed via @garmin/fitsdk — chosen over fit-file-parser because it is
+// the format owner's official SDK (regenerated with every FIT profile release,
+// so new Garmin fields never break decoding), fully typed, and it returns
+// position fields as RAW semicircles, letting us own the documented
+// semicircles × (180 / 2^31) → degrees conversion instead of trusting a
+// third-party's unit options. It is loaded with a dynamic import so only
+// activities that actually are FIT pay its download cost.
 //
 // Parse-permissive philosophy (matches the CSV parser): individual bad track
 // points are skipped, not fatal; only a structurally unreadable file yields
@@ -48,7 +50,6 @@ export interface ParsedTrack {
 // unhandled-rejection crash the spec forbids on bad files.
 export type TrackParseResult =
   | { kind: 'track'; track: ParsedTrack }
-  | { kind: 'unsupported-fit' } // .fit / .fit.gz — see decision note above
   | { kind: 'unsupported-gz' } // .gz file but no DecompressionStream (old Safari)
   | { kind: 'unsupported-format' } // extension we don't recognise at all
   | { kind: 'error' } // corrupt / unreadable file
@@ -180,6 +181,54 @@ export function parseTcx(xmlText: string): TrackParseResult {
   return buildTrack(points)
 }
 
+// ─── FIT ──────────────────────────────────────────────────────────────────────
+
+// FIT stores coordinates as sint32 "semicircles": the full signed 32-bit range
+// maps onto ±180°, so degrees = semicircles × (180 / 2^31). This constant IS
+// the format spec — the SDK deliberately does not convert position fields.
+const SEMICIRCLES_TO_DEGREES = 180 / 2 ** 31
+
+/** FIT: record messages carry timestamp / position / altitude / heart rate. */
+export async function parseFit(buffer: ArrayBuffer): Promise<TrackParseResult> {
+  // Dynamic import: the SDK (profile tables included) is only fetched when a
+  // FIT activity is actually opened — GPX/TCX users never download it.
+  const { Decoder, Stream } = await import('@garmin/fitsdk')
+  try {
+    const stream = Stream.fromArrayBuffer(buffer)
+    // Header signature check first: a non-FIT payload (or garbage) is a
+    // corrupt file from the user's point of view, not an unsupported format.
+    if (!Decoder.isFIT(stream)) return { kind: 'error' }
+
+    const { messages, errors } = new Decoder(stream).read()
+    const records = messages.recordMesgs ?? []
+    // Parse-permissive: decode errors only become fatal when they left us with
+    // no records at all — a partially damaged file still charts what it has.
+    if (records.length === 0 && errors.length > 0) return { kind: 'error' }
+
+    const points: TrackPoint[] = []
+    for (const r of records) {
+      // Records without a position (GPS dropout, indoor stretches) are
+      // skipped, mirroring the GPX/TCX parsers.
+      if (typeof r.positionLat !== 'number' || typeof r.positionLong !== 'number') continue
+      const point: TrackPoint = {
+        lat: r.positionLat * SEMICIRCLES_TO_DEGREES,
+        lon: r.positionLong * SEMICIRCLES_TO_DEGREES,
+      }
+      // enhancedAltitude (32-bit) supersedes altitude (16-bit) when present —
+      // same field, more range; the SDK has already applied scale/offset.
+      const ele = r.enhancedAltitude ?? r.altitude
+      if (typeof ele === 'number' && Number.isFinite(ele)) point.ele = ele
+      if (r.timestamp instanceof Date) point.time = r.timestamp.getTime()
+      if (typeof r.heartRate === 'number') point.hr = r.heartRate
+      points.push(point)
+    }
+    return buildTrack(points)
+  } catch {
+    // Truncated/CRC-broken FIT — the decoder throws; surface as 'error'.
+    return { kind: 'error' }
+  }
+}
+
 // ─── Blob reading ─────────────────────────────────────────────────────────────
 //
 // FileReader instead of the newer Blob.text()/.arrayBuffer(): identical
@@ -221,7 +270,7 @@ function readBlobAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
  * than a crash on older engines (no pako dependency: the export's .gz files
  * are the only compressed input, and modern engines all have the native API).
  */
-async function gunzipToText(blob: Blob): Promise<string | null> {
+async function gunzipToArrayBuffer(blob: Blob): Promise<ArrayBuffer | null> {
   try {
     // Via ArrayBuffer→Response rather than blob.stream(): identical result in
     // browsers, but it also works under jsdom (whose Blob lacks .stream()),
@@ -229,11 +278,16 @@ async function gunzipToText(blob: Blob): Promise<string | null> {
     const body = new Response(await readBlobAsArrayBuffer(blob)).body
     if (body === null) return null
     const stream = body.pipeThrough(new DecompressionStream('gzip'))
-    return await new Response(stream).text()
+    return await new Response(stream).arrayBuffer()
   } catch {
     // Truncated/corrupt gzip payload — surfaced as a parse error upstream.
     return null
   }
+}
+
+async function gunzipToText(blob: Blob): Promise<string | null> {
+  const buffer = await gunzipToArrayBuffer(blob)
+  return buffer === null ? null : new TextDecoder().decode(buffer)
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
@@ -245,10 +299,23 @@ async function gunzipToText(blob: Blob): Promise<string | null> {
 export async function parseTrackBlob(fileRef: string, blob: Blob): Promise<TrackParseResult> {
   const { base, gzipped } = detectTrackFormat(fileRef)
 
-  if (base === 'fit') return { kind: 'unsupported-fit' }
   if (base === 'unknown') return { kind: 'unsupported-format' }
 
   try {
+    // FIT is binary — it takes the ArrayBuffer path, never the text one.
+    if (base === 'fit') {
+      let buffer: ArrayBuffer
+      if (gzipped) {
+        if (typeof DecompressionStream === 'undefined') return { kind: 'unsupported-gz' }
+        const decompressed = await gunzipToArrayBuffer(blob)
+        if (decompressed === null) return { kind: 'error' }
+        buffer = decompressed
+      } else {
+        buffer = await readBlobAsArrayBuffer(blob)
+      }
+      return await parseFit(buffer)
+    }
+
     let text: string
     if (gzipped) {
       if (typeof DecompressionStream === 'undefined') return { kind: 'unsupported-gz' }

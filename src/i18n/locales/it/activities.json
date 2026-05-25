@@ -19,7 +19,6 @@
     "route": "Percorso",
     "elevationProfile": "Altimetria",
     "heartRate": "Frequenza cardiaca",
-    "fitNotSupported": "Questa attività è stata registrata come file FIT, non ancora supportato per la visualizzazione del tracciato.",
     "gzNotSupported": "Questo browser non può decomprimere il file del tracciato.",
     "trackError": "Impossibile leggere il file del tracciato di questa attività.",
     "trackEmpty": "Il file del tracciato non contiene punti GPS."

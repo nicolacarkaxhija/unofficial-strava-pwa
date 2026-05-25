@@ -179,13 +179,11 @@ function TrackSection({
 
   if (parsed.kind !== 'track') {
     const noteKey =
-      parsed.kind === 'unsupported-fit'
-        ? 'detail.fitNotSupported'
-        : parsed.kind === 'unsupported-gz'
-          ? 'detail.gzNotSupported'
-          : parsed.kind === 'empty'
-            ? 'detail.trackEmpty'
-            : 'detail.trackError' // 'error' and 'unsupported-format'
+      parsed.kind === 'unsupported-gz'
+        ? 'detail.gzNotSupported'
+        : parsed.kind === 'empty'
+          ? 'detail.trackEmpty'
+          : 'detail.trackError' // 'error' and 'unsupported-format'
     return (
       <p
         className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400"

@@ -5,7 +5,7 @@
 //   i=1 Ride #2  → .gpx     (no HR)
 //   i=2 Walk #3  → .tcx     (with HR)
 //   i=3 Swim #4  → .gpx.gz  (gzipped)
-//   i=4 Run #5   → .fit     (dummy — unsupported path)
+//   i=4 Run #5   → .fit     (real binary FIT, with HR)
 //   i≥5          → no file  (stats-only path)
 // Ids are deterministic (`9${100000000+i}`), so direct-URL tests can address
 // any of these without scraping the list first.
@@ -70,14 +70,12 @@ test('a gzipped GPX decompresses in the browser and renders the route', async ({
   await expect(page.getByTestId('route-map')).toBeVisible()
 })
 
-test('a FIT activity shows the unsupported note instead of charts', async ({ page }) => {
+test('a FIT activity decodes in the browser and renders route and HR chart', async ({ page }) => {
   await page.goto(`/activities/${id(4)}`)
 
-  const note = page.getByTestId('track-note')
-  await expect(note).toBeVisible()
-  await expect(note).toHaveAttribute('data-note-kind', 'unsupported-fit')
-  await expect(note).toContainText('FIT')
-  await expect(page.getByTestId('route-map')).toHaveCount(0)
+  await expect(page.getByTestId('route-map')).toBeVisible()
+  await expect(page.getByTestId('hr-chart')).toBeVisible()
+  await expect(page.getByTestId('track-note')).toHaveCount(0)
 })
 
 test('an activity without a raw file shows stats only — no charts, no note', async ({ page }) => {

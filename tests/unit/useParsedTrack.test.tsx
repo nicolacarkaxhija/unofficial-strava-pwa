@@ -49,6 +49,8 @@ describe('useParsedTrack', () => {
 
   it('re-parses when the raw file changes (navigation between details)', async () => {
     const gpx = makeRawFile('activities/1.gpx', buildGpx(cityLoopPoints()))
+    // A .fit ref with non-FIT bytes: exercises the FIT decode path failing
+    // cleanly, so the rerender lands on a different result kind than 'track'.
     const fit = makeRawFile('activities/2.fit', 'binary-ish')
     const { result, rerender } = renderHook(({ file }: { file: RawFile }) => useParsedTrack(file), {
       initialProps: { file: gpx },
@@ -58,7 +60,7 @@ describe('useParsedTrack', () => {
     })
     rerender({ file: fit })
     await waitFor(() => {
-      expect(result.current?.kind).toBe('unsupported-fit')
+      expect(result.current?.kind).toBe('error')
     })
   })
 })

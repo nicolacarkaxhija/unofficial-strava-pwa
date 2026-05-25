@@ -19,7 +19,6 @@
     "route": "Route",
     "elevationProfile": "Elevation",
     "heartRate": "Heart rate",
-    "fitNotSupported": "This activity was recorded as a FIT file, which is not yet supported for track display.",
     "gzNotSupported": "This browser cannot decompress the stored track file.",
     "trackError": "The track file for this activity could not be read.",
     "trackEmpty": "The track file contains no GPS points."

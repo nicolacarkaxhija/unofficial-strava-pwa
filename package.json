@@ -26,6 +26,7 @@
     ]
   },
   "dependencies": {
+    "@garmin/fitsdk": "^21.208.0",
     "@tanstack/react-router": "^1.0.0",
     "date-fns": "^4.1.0",
     "dexie": "^4.0.10",
