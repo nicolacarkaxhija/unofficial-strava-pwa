@@ -4,6 +4,7 @@ import {
   computeWeeklyTotals,
   computeWeekAtAGlance,
   computeRecords,
+  rollingFourWeek,
   sportTypes,
 } from '@/lib/aggregates'
 import type { Activity } from '@/db/schema'
@@ -224,5 +225,85 @@ describe('sportTypes', () => {
       act({ type: '' }),
     ])
     expect(types).toEqual(['Ride', 'Run'])
+  })
+})
+
+// ─── rollingFourWeek ──────────────────────────────────────────────────────────
+
+describe('rollingFourWeek', () => {
+  // Anchor: newest Run is 2026-06-15. Current window = the anchor's calendar
+  // day plus the 27 days before it; previous = the 28 days before that.
+  it('splits activities into current/previous 28-day windows and computes the delta', () => {
+    const result = rollingFourWeek(
+      [
+        act({ date: '2026-06-15T08:00:00.000Z', distanceKm: 10 }), // anchor, current
+        act({ date: '2026-06-01T08:00:00.000Z', distanceKm: 5 }), // current
+        act({ date: '2026-05-10T08:00:00.000Z', distanceKm: 7 }), // previous
+        act({ date: '2026-03-01T08:00:00.000Z', distanceKm: 99 }), // before both — ignored
+      ],
+      'distanceKm',
+      'Run',
+    )
+    expect(result).toEqual({ current: 15, previous: 7, delta: 8 })
+  })
+
+  it('anchors on the newest activity date, NOT today — stale exports still compare', () => {
+    // Everything is years in the past; a "today"-anchored window would be empty.
+    const result = rollingFourWeek(
+      [
+        act({ date: '2023-04-20T08:00:00.000Z', distanceKm: 12 }),
+        act({ date: '2023-04-01T08:00:00.000Z', distanceKm: 8 }),
+      ],
+      'distanceKm',
+      'Run',
+    )
+    expect(result?.current).toBe(20)
+  })
+
+  it('treats the window boundary as half-open: day 27 back is current, day 28 back is previous', () => {
+    const result = rollingFourWeek(
+      [
+        act({ date: '2026-06-15T08:00:00.000Z', distanceKm: 1 }), // anchor day
+        act({ date: '2026-05-19T08:00:00.000Z', distanceKm: 2 }), // 27 days back → current
+        act({ date: '2026-05-18T08:00:00.000Z', distanceKm: 4 }), // 28 days back → previous
+      ],
+      'distanceKm',
+      'Run',
+    )
+    expect(result).toEqual({ current: 3, previous: 4, delta: -1 })
+  })
+
+  it('a gap in the previous window yields previous 0 and a fully-positive delta', () => {
+    const result = rollingFourWeek(
+      [act({ date: '2026-06-15T08:00:00.000Z', movingTimeSec: 3600 })],
+      'movingTimeSec',
+      'Run',
+    )
+    expect(result).toEqual({ current: 3600, previous: 0, delta: 3600 })
+  })
+
+  it('only counts the requested sport', () => {
+    const result = rollingFourWeek(
+      [
+        act({ date: '2026-06-15T08:00:00.000Z', type: 'Run', distanceKm: 10 }),
+        act({ date: '2026-06-14T08:00:00.000Z', type: 'Ride', distanceKm: 50 }),
+      ],
+      'distanceKm',
+      'Run',
+    )
+    expect(result?.current).toBe(10)
+  })
+
+  it('null metrics contribute 0, never NaN', () => {
+    const result = rollingFourWeek(
+      [act({ date: '2026-06-15T08:00:00.000Z', elevationGainM: null })],
+      'elevationGainM',
+      'Run',
+    )
+    expect(result).toEqual({ current: 0, previous: 0, delta: 0 })
+  })
+
+  it('returns null when the sport has no activities to anchor on', () => {
+    expect(rollingFourWeek([act({ type: 'Ride' })], 'distanceKm', 'Run')).toBeNull()
   })
 })

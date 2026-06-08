@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LoadingSkeleton } from '@/components/ui'
+import { DeltaBadge, LoadingSkeleton } from '@/components/ui'
 import { WeeklyBarChart } from '@/components/charts/WeeklyBarChart'
 import { useAllActivities } from '@/db/hooks'
-import { computeWeeklyTotals, computeRecords, sportTypes } from '@/lib/aggregates'
+import { computeWeeklyTotals, computeRecords, rollingFourWeek, sportTypes } from '@/lib/aggregates'
 import { useUnits } from '@/lib/useUnits'
 import { formatDistance, formatDuration, formatElevation } from '@/lib/units'
 import type { PersonalRecord } from '@/lib/aggregates'
@@ -57,6 +57,7 @@ export default function Trends() {
   const sportActivities = activities.filter((a) => a.type === activeSport)
   const buckets = computeWeeklyTotals(sportActivities)
   const records = computeRecords(activities, activeSport)
+  const rolling = rollingFourWeek(activities, metric, activeSport)
 
   const formatMetric = (value: number): string =>
     metric === 'distanceKm'
@@ -94,6 +95,31 @@ export default function Trends() {
           </button>
         ))}
       </div>
+
+      {/* Rolling 4-week comparison — anchored to the newest activity, not
+          today (see rollingFourWeek), so a stale export still compares its
+          final month against the month before. */}
+      {rolling && (
+        <div
+          className="mb-4 flex items-center justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800"
+          data-testid="rolling-four-week"
+        >
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase dark:text-slate-400">
+              {t('rolling.title')}
+            </p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">
+              {formatMetric(rolling.current)}
+            </p>
+          </div>
+          <DeltaBadge
+            delta={rolling.delta}
+            format={(n) => formatMetric(Math.abs(n))}
+            title={t('rolling.vsPrevious')}
+            testId="rolling-delta"
+          />
+        </div>
+      )}
 
       {/* Weekly volume chart with metric switcher */}
       <div className="mb-6 rounded-2xl bg-white p-4 shadow-sm dark:bg-slate-800">

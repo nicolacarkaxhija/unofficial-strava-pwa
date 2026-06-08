@@ -65,3 +65,11 @@ test('personal records show longest distance, duration and elevation', async ({ 
   // Distance record renders a value in the active units.
   await expect(records).toContainText('km')
 })
+
+test('rolling 4-week row shows the current total with a delta badge', async ({ page }) => {
+  // Fixture spans 90 days ending yesterday, so both 28-day windows have data.
+  const row = page.getByTestId('rolling-four-week')
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('Last 4 weeks')
+  await expect(row.getByTestId('rolling-delta')).toBeVisible()
+})

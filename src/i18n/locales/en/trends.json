@@ -9,6 +9,10 @@
     "time": "Time",
     "elevation": "Elevation"
   },
+  "rolling": {
+    "title": "Last 4 weeks",
+    "vsPrevious": "vs previous 4 weeks"
+  },
   "records": {
     "title": "Personal records",
     "longestDistance": "Longest distance",

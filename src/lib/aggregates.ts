@@ -9,7 +9,7 @@
 // (2025-12-29 belongs to 2026-W01). date-fns provides the ISO week math; a
 // hand-rolled implementation is where week-boundary bugs come from.
 
-import { getISOWeek, getISOWeekYear, startOfISOWeek, subWeeks } from 'date-fns'
+import { addDays, getISOWeek, getISOWeekYear, startOfDay, startOfISOWeek, subDays, subWeeks } from 'date-fns'
 import type { Activity } from '@/db/schema'
 
 export interface WeekTotals {
@@ -123,6 +123,64 @@ export function computeWeekAtAGlance(
       count: current.count - previous.count,
     },
   }
+}
+
+// ─── Rolling 4-week comparison ────────────────────────────────────────────────
+
+export type VolumeMetric = 'distanceKm' | 'movingTimeSec' | 'elevationGainM'
+
+export interface RollingFourWeek {
+  /** Total over the 28 calendar days ending on the newest activity's day. */
+  current: number
+  /** Total over the 28 calendar days immediately before that window. */
+  previous: number
+  /** current − previous. */
+  delta: number
+}
+
+/**
+ * Rolling 28-day volume vs the 28 days before it, for one sport and metric.
+ *
+ * Windows are anchored to the NEWEST matching activity's calendar day — NOT
+ * today. A GDPR export is a snapshot that is often weeks old by the time it
+ * is imported; anchoring on "now" would leave both windows empty and the
+ * comparison meaningless, while anchoring on the data always reads as "the
+ * final month of recorded history vs the month before it".
+ *
+ * Both windows are half-open [start, end) on local-midnight boundaries, so a
+ * boundary activity counts in exactly one window.
+ *
+ * Returns null when the sport has no activities (no anchor exists).
+ */
+export function rollingFourWeek(
+  activities: Activity[],
+  metric: VolumeMetric,
+  sport: string,
+): RollingFourWeek | null {
+  const matching = activities.filter((a) => a.type === sport)
+  if (matching.length === 0) return null
+
+  let newest = new Date(matching[0]?.date ?? 0)
+  for (const a of matching) {
+    const d = new Date(a.date)
+    if (d > newest) newest = d
+  }
+
+  // Current window: the anchor's calendar day plus the 27 days before it
+  // (28 calendar days inclusive of the anchor day).
+  const currentEnd = addDays(startOfDay(newest), 1) // exclusive
+  const currentStart = subDays(currentEnd, 28)
+  const previousStart = subDays(currentStart, 28)
+
+  let current = 0
+  let previous = 0
+  for (const a of matching) {
+    const d = new Date(a.date)
+    const value = a[metric] ?? 0 // null metrics contribute 0, never NaN
+    if (d >= currentStart && d < currentEnd) current += value
+    else if (d >= previousStart && d < currentStart) previous += value
+  }
+  return { current, previous, delta: current - previous }
 }
 
 // ─── Personal records ─────────────────────────────────────────────────────────
