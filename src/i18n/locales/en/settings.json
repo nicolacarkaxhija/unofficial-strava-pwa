@@ -7,7 +7,9 @@
     "clearAll": "Clear all data",
     "clearConfirm": "This will delete all your activity data from this device. You can re-import at any time.",
     "cancel": "Cancel",
-    "exportJson": "Export data (JSON)"
+    "exportJson": "Export data (JSON)",
+    "stale": "Your data is {{days}} days old — recent activities are missing.",
+    "staleCta": "Request a fresh archive on Strava →"
   },
   "appearance": {
     "title": "Appearance",

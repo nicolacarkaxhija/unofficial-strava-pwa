@@ -84,6 +84,11 @@ export default function Settings() {
     ? format(new Date(importStats.importedAt), 'dd MMM yyyy HH:mm')
     : null
 
+  // Whole days since the last import — drives the staleness nudge below.
+  const staleDays = importStats?.importedAt
+    ? Math.floor((Date.now() - new Date(importStats.importedAt).getTime()) / 86_400_000)
+    : null
+
   return (
     <div className="mx-auto max-w-lg space-y-6 p-4 pb-[calc(5rem+var(--safe-area-bottom))]">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('title')}</h1>
@@ -95,6 +100,29 @@ export default function Settings() {
             {t('data.lastImport', { date: lastImportDate })}
           </p>
         ) : null}
+
+        {/* Staleness nudge — the app can't sync automatically (using Strava's
+            API would mean accepting their anti-replication terms; the export
+            path carries no contract), so instead we tell the user how old
+            their data is and deep-link the official export page. 14 days ≈
+            "your recent training is missing", early enough to matter without
+            nagging weekly importers. */}
+        {staleDays !== null && staleDays > 14 && (
+          <div
+            data-testid="staleness-hint"
+            className="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200"
+          >
+            <p>{t('data.stale', { days: staleDays })}</p>
+            <a
+              href="https://www.strava.com/account/download_or_delete"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-block font-semibold underline"
+            >
+              {t('data.staleCta')}
+            </a>
+          </div>
+        )}
 
         <label className="block">
           <span className="sr-only">{t('data.importNew')}</span>
