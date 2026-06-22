@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import i18n from 'i18next'
@@ -85,9 +85,18 @@ export default function Settings() {
     : null
 
   // Whole days since the last import — drives the staleness nudge below.
-  const staleDays = importStats?.importedAt
-    ? Math.floor((Date.now() - new Date(importStats.importedAt).getTime()) / 86_400_000)
-    : null
+  // Computed in an effect, not during render: reading the clock in render is
+  // impure (react-hooks/purity) and staleness measured in days doesn't need
+  // to tick — once per mount is exact enough.
+  const [staleDays, setStaleDays] = useState<number | null>(null)
+  const importedAt = importStats?.importedAt
+  useEffect(() => {
+    setStaleDays(
+      importedAt != null
+        ? Math.floor((Date.now() - new Date(importedAt).getTime()) / 86_400_000)
+        : null,
+    )
+  }, [importedAt])
 
   return (
     <div className="mx-auto max-w-lg space-y-6 p-4 pb-[calc(5rem+var(--safe-area-bottom))]">

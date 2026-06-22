@@ -1,0 +1,8 @@
+# Repo-wide fast gates before anything reaches CI. lint-staged (pre-commit)
+# only checks CHANGED files, which lets cross-file breakage through — a
+# partial-lint escape shipped a red main once; this hook closes that hole.
+# E2E is deliberately excluded (too slow for a push gate); CI remains the
+# authority for the full suite and the deploy gate.
+npx tsc --noEmit || exit 1
+npx eslint . --max-warnings 0 || exit 1
+npx vitest run --silent || exit 1
