@@ -29,6 +29,18 @@ export interface ImportProgress {
 // worker.
 export const MAX_ZIP_BYTES = 200 * 1024 * 1024
 
+// Module-level in-flight lock. Two call sites can legitimately race: App's
+// Safari-eviction recovery fires on mount while the user may simultaneously
+// start a manual (re-)import. Each import clears the tables before writing,
+// so two concurrent runs interleave clears and bulkPuts — the last transaction
+// wins but progress UIs and importStats can end up describing the loser.
+// Coalescing (returning the in-flight promise) beats queueing: both racers
+// import the same account export, so running it twice buys nothing. The
+// second caller's onProgress is not attached — the silent recovery path
+// passes none, and a user-visible import that joins a recovery run still
+// resolves/rejects correctly, which is what the UI state machine keys on.
+let inFlight: Promise<void> | null = null
+
 export function runImport(blob: Blob, onProgress?: (p: ImportProgress) => void): Promise<void> {
   if (blob.size > MAX_ZIP_BYTES) {
     return Promise.reject(
@@ -36,7 +48,9 @@ export function runImport(blob: Blob, onProgress?: (p: ImportProgress) => void):
     )
   }
 
-  return new Promise((resolve, reject) => {
+  if (inFlight !== null) return inFlight
+
+  const run = new Promise<void>((resolve, reject) => {
     const worker = new Worker(new URL('./import.worker.ts', import.meta.url), {
       type: 'module',
     })
@@ -67,4 +81,11 @@ export function runImport(blob: Blob, onProgress?: (p: ImportProgress) => void):
 
     worker.postMessage({ type: 'start', payload: { blob } })
   })
+
+  // Release the lock on settle (success OR failure) so the next import —
+  // e.g. a retry after a corrupt-file error — can start a fresh worker.
+  inFlight = run.finally(() => {
+    inFlight = null
+  })
+  return inFlight
 }
