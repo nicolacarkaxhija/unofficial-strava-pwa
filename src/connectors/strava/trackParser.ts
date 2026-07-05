@@ -55,6 +55,39 @@ export type TrackParseResult =
   | { kind: 'error' } // corrupt / unreadable file
   | { kind: 'empty' } // parsed fine but zero usable points (e.g. treadmill GPX)
 
+// ─── Input caps ───────────────────────────────────────────────────────────────
+//
+// Defense against a pathological single file (hand-crafted or a gzip bomb —
+// the export's .gz files are decompressed in-memory before parsing): without
+// caps, one bad file could OOM the whole tab. Real-world scale for reference:
+// a 24 h 1 Hz recording is ~86 k points and a few tens of MB of XML, so both
+// limits sit far above anything a legitimate activity produces.
+
+/** Max decompressed/raw text or FIT buffer size accepted for parsing (50 MB). */
+export const MAX_TRACK_BYTES = 50 * 1024 * 1024
+
+/** Max points kept per track (200 k). Beyond this the track is DOWNSAMPLED
+ * with a uniform stride rather than truncated: charts should still show the
+ * whole route/effort at reduced resolution, not silently drop its second
+ * half. The last point is always kept so total distance stays honest. */
+export const MAX_TRACK_POINTS = 200_000
+
+/** Uniform-stride downsample to at most MAX_TRACK_POINTS (see above).
+ * Exported for unit tests: driving it through parseGpx would need a 200k-point
+ * XML fixture, which is exactly the pathological input we're defending against. */
+export function capPoints(points: TrackPoint[]): TrackPoint[] {
+  if (points.length <= MAX_TRACK_POINTS) return points
+  const stride = Math.ceil(points.length / MAX_TRACK_POINTS)
+  const sampled: TrackPoint[] = []
+  for (let i = 0; i < points.length; i += stride) {
+    const pt = points[i]
+    if (pt !== undefined) sampled.push(pt) // undefined is unreachable; satisfies noUncheckedIndexedAccess
+  }
+  const last = points.at(-1)
+  if (last !== undefined && sampled.at(-1) !== last) sampled.push(last)
+  return sampled
+}
+
 // ─── Format detection ─────────────────────────────────────────────────────────
 
 export interface TrackFormat {
@@ -104,8 +137,9 @@ function numericText(el: Element | null): number | undefined {
 
 // ─── Per-format parsers ───────────────────────────────────────────────────────
 
-function buildTrack(points: TrackPoint[]): TrackParseResult {
-  if (points.length === 0) return { kind: 'empty' }
+function buildTrack(rawPoints: TrackPoint[]): TrackParseResult {
+  if (rawPoints.length === 0) return { kind: 'empty' }
+  const points = capPoints(rawPoints)
   const cumulativeKm = cumulativeDistanceKm(points)
   return {
     kind: 'track',
@@ -313,6 +347,10 @@ export async function parseTrackBlob(fileRef: string, blob: Blob): Promise<Track
       } else {
         buffer = await readBlobAsArrayBuffer(blob)
       }
+      // Size cap AFTER decompression — that's where a gzip bomb inflates.
+      // Surfaced as 'error': from the user's perspective a 50 MB+ single
+      // activity file is not a readable recording.
+      if (buffer.byteLength > MAX_TRACK_BYTES) return { kind: 'error' }
       return await parseFit(buffer)
     }
 
@@ -325,6 +363,9 @@ export async function parseTrackBlob(fileRef: string, blob: Blob): Promise<Track
     } else {
       text = await readBlobAsText(blob)
     }
+    // Same post-decompression cap for the XML formats (UTF-16 code units ≈
+    // bytes for GPX/TCX, which are ASCII-dominated markup).
+    if (text.length > MAX_TRACK_BYTES) return { kind: 'error' }
     return base === 'gpx' ? parseGpx(text) : parseTcx(text)
   } catch {
     // Blob read failures (e.g. Safari evicted the backing store) land here.

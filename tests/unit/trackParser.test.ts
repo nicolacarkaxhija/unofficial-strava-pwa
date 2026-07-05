@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { gzipSync } from 'node:zlib'
 import {
+  MAX_TRACK_BYTES,
+  MAX_TRACK_POINTS,
+  capPoints,
   detectTrackFormat,
   parseFit,
   parseGpx,
   parseTcx,
   parseTrackBlob,
 } from '@/connectors/strava/trackParser'
+import type { TrackPoint } from '@/connectors/strava/trackParser'
 import { buildFit, buildGpx, buildTcx, cityLoopPoints } from '../fixtures/trackFiles'
 
 // Uint8Array → standalone ArrayBuffer (a subarray's .buffer would leak offsets).
@@ -226,5 +230,37 @@ describe('parseTrackBlob', () => {
   it('returns error for a corrupt XML blob', async () => {
     const blob = new Blob(['<gpx><trkpt'])
     expect((await parseTrackBlob('activities/1.gpx', blob)).kind).toBe('error')
+  })
+})
+
+// ─── Input caps ───────────────────────────────────────────────────────────────
+
+describe('input caps', () => {
+  it('downsamples above MAX_TRACK_POINTS with a uniform stride, keeping the last point', () => {
+    const many: TrackPoint[] = Array.from({ length: MAX_TRACK_POINTS * 2 + 1 }, (_, i) => ({
+      lat: i,
+      lon: i,
+    }))
+    const capped = capPoints(many)
+    expect(capped.length).toBeLessThanOrEqual(MAX_TRACK_POINTS + 1) // +1: appended last point
+    expect(capped[0]).toBe(many[0])
+    expect(capped.at(-1)).toBe(many.at(-1))
+    // Uniform stride: consecutive kept points are equally spaced in the source.
+    expect(capped[1]?.lat).toBe(3) // stride ceil((400001)/200000) = 3
+  })
+
+  it('leaves tracks at or below the cap untouched', () => {
+    const few: TrackPoint[] = [
+      { lat: 0, lon: 0 },
+      { lat: 1, lon: 1 },
+    ]
+    expect(capPoints(few)).toBe(few)
+  })
+
+  it('rejects an oversized XML payload as error instead of parsing it', async () => {
+    // 50 MB + 1 of junk behind a .gpx name — must be refused BEFORE DOMParser
+    // gets to allocate a tree for it.
+    const blob = new Blob(['a'.repeat(MAX_TRACK_BYTES + 1)])
+    expect((await parseTrackBlob('activities/big.gpx', blob)).kind).toBe('error')
   })
 })
