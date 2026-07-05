@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { LoadingSkeleton, RangeSelector, SportIcon } from '@/components/ui'
@@ -47,6 +47,18 @@ export default function ActivityList() {
   // rows, and chips need the full type census anyway.
   const all = useAllActivities()
 
+  // Memoized above the loading return (rules of hooks): filtering a decade of
+  // rows on every keystroke-level re-render is the kind of hidden O(n) work
+  // that makes low-end phones jank. cutoffIso reads the clock, so the memo is
+  // keyed on rangeDays — the cutoff only shifts when the user changes range
+  // (or remounts), which is exactly the freshness the range chips promise.
+  const types = useMemo(() => (all === undefined ? [] : sportTypes(all)), [all])
+  const filtered = useMemo(() => {
+    if (all === undefined) return []
+    const cutoff = cutoffIso(rangeDays)
+    return all.filter((a) => a.date >= cutoff && (typeFilter === null || a.type === typeFilter))
+  }, [all, rangeDays, typeFilter])
+
   if (all === undefined) {
     return (
       <div className="px-4 pt-8 pb-6">
@@ -58,12 +70,6 @@ export default function ActivityList() {
       </div>
     )
   }
-
-  const types = sportTypes(all)
-  const cutoff = cutoffIso(rangeDays)
-  const filtered = all.filter(
-    (a) => a.date >= cutoff && (typeFilter === null || a.type === typeFilter),
-  )
 
   return (
     <div className="px-4 pt-8 pb-6">

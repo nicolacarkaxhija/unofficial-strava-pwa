@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { DeltaBadge, LoadingSkeleton, SportIcon } from '@/components/ui'
@@ -29,7 +30,16 @@ export default function Dashboard() {
 
   const activities = useAllActivities()
 
-  if (activities === undefined) {
+  // useLiveQuery returns a NEW array identity on every IndexedDB change, but
+  // unrelated re-renders (theme, i18n, router) keep the same reference — memo
+  // keyed on it stops the full-dataset week aggregation from re-running on
+  // every render. Must sit above the early return (rules of hooks).
+  const glance = useMemo(
+    () => (activities === undefined ? undefined : computeWeekAtAGlance(activities)),
+    [activities],
+  )
+
+  if (activities === undefined || glance === undefined) {
     return (
       <div className="px-4 pt-8 pb-6">
         <div className="grid grid-cols-2 gap-4">
@@ -41,7 +51,6 @@ export default function Dashboard() {
     )
   }
 
-  const glance = computeWeekAtAGlance(activities)
   const recent = activities.slice(0, 5)
 
   // Each tile formats its own value/delta pair with the same formatter so the

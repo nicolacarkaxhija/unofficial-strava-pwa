@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DeltaBadge, LoadingSkeleton } from '@/components/ui'
 import { WeeklyBarChart } from '@/components/charts/WeeklyBarChart'
@@ -34,6 +34,33 @@ export default function Trends() {
 
   const activities = useAllActivities()
 
+  // All four aggregates walk the FULL activities array; memoized above the
+  // early returns (rules of hooks) so switching metric only recomputes the
+  // rolling comparison and a plain re-render recomputes nothing.
+  const types = useMemo(() => (activities === undefined ? [] : sportTypes(activities)), [activities])
+  const activeSport = sport ?? types.at(0) ?? null
+  const buckets = useMemo(
+    () =>
+      activities === undefined || activeSport === null
+        ? []
+        : computeWeeklyTotals(activities.filter((a) => a.type === activeSport)),
+    [activities, activeSport],
+  )
+  const records = useMemo(
+    () =>
+      activities === undefined || activeSport === null
+        ? null
+        : computeRecords(activities, activeSport),
+    [activities, activeSport],
+  )
+  const rolling = useMemo(
+    () =>
+      activities === undefined || activeSport === null
+        ? null
+        : rollingFourWeek(activities, metric, activeSport),
+    [activities, metric, activeSport],
+  )
+
   if (activities === undefined) {
     return (
       <div className="px-4 pt-8 pb-6">
@@ -42,10 +69,9 @@ export default function Trends() {
     )
   }
 
-  const types = sportTypes(activities)
-  const activeSport = sport ?? types.at(0) ?? null
-
-  if (activeSport === null) {
+  // records === null exactly when activeSport === null; the extra check just
+  // narrows the type for the render below.
+  if (activeSport === null || records === null) {
     return (
       <div className="px-4 pt-8 pb-6">
         <h1 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">{t('title')}</h1>
@@ -53,11 +79,6 @@ export default function Trends() {
       </div>
     )
   }
-
-  const sportActivities = activities.filter((a) => a.type === activeSport)
-  const buckets = computeWeeklyTotals(sportActivities)
-  const records = computeRecords(activities, activeSport)
-  const rolling = rollingFourWeek(activities, metric, activeSport)
 
   const formatMetric = (value: number): string =>
     metric === 'distanceKm'
