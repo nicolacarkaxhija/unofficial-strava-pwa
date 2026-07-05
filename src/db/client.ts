@@ -33,7 +33,7 @@ class StravaPWADatabase extends Dexie {
       // date: orderBy('date') powers every list/aggregate query.
       // type: sport-filter chips on the Activities page.
       activities: 'id, date, type',
-      // rawFiles: PK is the CSV Filename; activityId index lets phase 2 find
+      // rawFiles: PK is the CSV Filename; activityId index lets the detail page find
       // the raw track for a given activity without a full-table scan.
       rawFiles: 'id, activityId',
       meta: 'key',

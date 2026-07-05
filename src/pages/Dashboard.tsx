@@ -123,7 +123,9 @@ export default function Dashboard() {
 // ─── ActivityRow ──────────────────────────────────────────────────────────────
 //
 // Kept private to Dashboard: the Activities page has its own richer row.
-// No detail page exists in v1, so rows are static (not links).
+// Rows here are deliberately static (not links to /activities/$id): the
+// dashboard is a glance surface; drill-down lives one tap away on the
+// Activities list, whose rows do link to the detail page.
 
 function ActivityRow({ activity, units }: { activity: Activity; units: Units }) {
   return (

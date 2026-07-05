@@ -5,9 +5,10 @@
 // instead of a re-implementation that silently diverges. The worker file is a
 // thin postMessage shell around this function.
 //
-// Source-agnostic by design: the only input is a Blob. When phase B (Strava
-// OAuth sync) lands, an API source can write to the same tables through a
-// sibling function without touching this one.
+// Source-agnostic by design: the only input is a Blob. Note that Strava
+// OAuth/API sync was evaluated and permanently DECLINED for legal reasons
+// (Strava's API agreement forbids replacement-client use) — the GDPR export
+// ZIP is the only data source this app will ever have.
 
 import JSZip from 'jszip'
 import Papa from 'papaparse'
@@ -76,9 +77,11 @@ export async function importZip(blob: Blob, onProgress: ProgressFn): Promise<Imp
   const activities: Activity[] = parseActivities(parseCsv(await csvEntry.async('string')))
 
   // Step 3: Collect raw per-activity files (GPX/TCX/FIT, possibly .gz).
-  // NOT parsed in v1 — stored as opaque blobs so phase 2 can parse them without
-  // a re-upload. Only files referenced by a CSV row are stored: unreferenced
-  // archive entries (media, profile.json…) are out of scope.
+  // Deliberately not parsed HERE — stored as opaque blobs; the detail page
+  // parses exactly one lazily via connectors/strava/trackParser when opened.
+  // Parsing thousands of tracks up front would multiply import time for files
+  // most users never open. Only files referenced by a CSV row are stored:
+  // unreferenced archive entries (media, profile.json…) are out of scope.
   onProgress('Extracting activity files…', 40)
   const rawFiles: RawFile[] = []
   for (const activity of activities) {

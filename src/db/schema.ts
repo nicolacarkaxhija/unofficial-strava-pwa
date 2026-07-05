@@ -2,8 +2,8 @@
 //
 // These TypeScript interfaces are the single source of truth for what is stored
 // in IndexedDB. They mirror the Strava GDPR account-export `activities.csv`
-// columns (v1 parses only that file; raw per-activity files are stored as
-// opaque blobs for a future phase-2 parser).
+// columns (the import parses only that file; raw per-activity files are
+// stored as opaque blobs and parsed lazily by the detail page's trackParser).
 //
 // Naming convention: camelCase here, Strava's exact "Title Case" headers in the
 // raw CSV. The parser in src/connectors/strava/parsers/ handles the mapping.
@@ -32,9 +32,9 @@ export interface Activity {
 
 // ─── Raw files ────────────────────────────────────────────────────────────────
 //
-// Phase 2 will parse GPX/TCX/FIT(.gz) tracks; v1 only STORES them so a future
-// upgrade can parse without asking the user to re-upload the export. The table
-// exists in schema v1 so no Dexie migration is needed when parsing lands.
+// The import STORES GPX/TCX/FIT(.gz) tracks unparsed; the activity detail page
+// parses one lazily via connectors/strava/trackParser when it opens. Keeping
+// the raw bytes means new parser capabilities never require a re-upload.
 
 export interface RawFile {
   id: string // PK: filename as written in the CSV "Filename" column (e.g. "activities/123.gpx")

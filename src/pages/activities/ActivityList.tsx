@@ -20,7 +20,7 @@ import type { Units } from '@/lib/units'
 // Display is additionally paginated with "Show more" so "All" on a decade-long
 // export doesn't render thousands of DOM rows at once.
 //
-// Each row links to /activities/$id (phase 2): the row shows the at-a-glance
+// Each row links to /activities/$id: the row shows the at-a-glance
 // fields; the detail page adds the full stat grid and the parsed-track charts.
 
 // Rows rendered before a "Show more" click — comfortably above the 1y
@@ -163,7 +163,7 @@ function SportChip({
 }
 
 function ActivityRow({ activity, units }: { activity: Activity; units: Units }) {
-  // The whole row is one Link (phase 2 detail page) — a full-row tap target
+  // The whole row is one Link to the detail page — a full-row tap target
   // beats a small chevron on mobile, and keeping data-testid="activity-item"
   // on the link preserves every existing E2E selector.
   return (
