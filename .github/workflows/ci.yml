@@ -1,18 +1,24 @@
 # CI/CD pipeline.
 #
 # Shape (trunk-based, deploy gated on green):
-#   typecheck → lint → test ─┬→ build ──────────┬→ deploy-prod (main only) → smoke
-#                            └→ e2e ────────────┘
-#                                build (PR) ────→ deploy-preview (PRs only)
+#   typecheck → lint → test ─┬→ build ─┬→ deploy-candidate → smoke-candidate ─┐
+#                            └→ e2e ───┤                                      │
+#                                audit ┘          deploy-prod ←───────────────┘
+#                                      │               │
+#                 deploy-preview (PRs) ┘          smoke-prod
 #
 # Policy decisions (see docs/TECHNICAL_SPEC.md):
 # - Direct pushes to main are allowed, but production deploys ONLY from a green
-#   run: the deploy job `needs` every quality gate. A broken commit can land on
-#   main but can never reach users.
+#   run: the deploy chain `needs` every quality gate. A broken commit can land
+#   on main but can never reach users.
+# - Candidate→promote: the exact artifact is first deployed to a fixed
+#   candidate branch alias and smoke-tested THERE before the same artifact is
+#   activated on production. Smoke runs BEFORE activation — a broken build is
+#   caught on the candidate URL while real users still get the previous deploy.
 # - Every PR gets an isolated preview URL on Cloudflare Pages — that IS the
 #   staging environment; a static PWA gains nothing from a fixed staging site.
 # - Observability is deliberately server-side only (Cloudflare request metrics
-#   + the smoke job): the app promises "no analytics, no data leaves the
+#   + the smoke jobs): the app promises "no analytics, no data leaves the
 #   device", so no client-side error tracking or RUM may ever be added.
 name: CI
 
@@ -23,11 +29,17 @@ on:
   pull_request:
     branches:
       - main # gate merges to main
+  # Manual re-deploys (e.g. after a flaky smoke run or a Cloudflare incident)
+  # without having to push an empty commit.
+  workflow_dispatch:
 
 # A branch with an open PR would otherwise run the whole pipeline twice
-# (push + pull_request); newer pushes should also cancel superseded runs.
+# (push + pull_request). For PR events the group is keyed on the PR number so
+# the push-event run on the same branch shares a group and gets deduped; for
+# plain pushes and dispatches it falls back to the ref. Newer runs cancel
+# superseded ones.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -144,7 +156,27 @@ jobs:
             test-results/
           retention-days: 14
 
-  # ── 5. Build ──────────────────────────────────────────────────────────────
+  # ── 5. Dependency audit ───────────────────────────────────────────────────
+  # Production dependencies only (--omit=dev): a vulnerable devDependency
+  # never ships to users, so it must not block a deploy — Renovate handles
+  # tooling updates on its own cadence. High+ severity gates the deploy chain.
+  audit:
+    name: Audit (prod deps)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22 (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  # ── 6. Build ──────────────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -178,7 +210,7 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ── 6. Deploy preview (PRs) ───────────────────────────────────────────────
+  # ── 7. Deploy preview (PRs) ───────────────────────────────────────────────
   # Every PR gets an isolated URL (<hash>.unofficial-strava-pwa.pages.dev, plus
   # a stable <branch> alias). This is the staging environment.
   deploy-preview:
@@ -197,19 +229,71 @@ jobs:
           path: dist
 
       - name: Deploy to Cloudflare Pages (preview)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=unofficial-strava-pwa --branch=${{ github.head_ref }}
 
-  # ── 7. Deploy production (main) ───────────────────────────────────────────
+  # ── 8. Deploy candidate (main) ────────────────────────────────────────────
+  # Candidate→promote, step 1: ship the tested artifact to a FIXED candidate
+  # branch alias first. Production stays untouched until the candidate URL
+  # passes smoke — smoke before activation, never only after.
+  deploy-candidate:
+    name: Deploy candidate
+    runs-on: ubuntu-latest
+    # The gate: every quality job must be green before anything ships.
+    needs: [lint, e2e, build, audit]
+    # Runs for pushes to main AND manual dispatches on main, so a re-deploy
+    # never requires an empty commit.
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Deploy to Cloudflare Pages (candidate)
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=unofficial-strava-pwa --branch=prod-candidate
+
+  # ── 9. Smoke test (candidate) ─────────────────────────────────────────────
+  # Probes the candidate alias BEFORE the artifact is promoted to production:
+  # SPA shell, a deep link (exercises the SPA fallback), the manifest and the
+  # service worker.
+  smoke-candidate:
+    name: Smoke test (candidate)
+    runs-on: ubuntu-latest
+    needs: deploy-candidate
+    steps:
+      - name: Probe candidate endpoints
+        run: |
+          set -e
+          base="https://prod-candidate.unofficial-strava-pwa.pages.dev"
+          for path in "/" "/activities" "/manifest.webmanifest" "/sw.js"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --retry 3 --retry-delay 5 "$base$path")
+            echo "$base$path -> $code"
+            [ "$code" = "200" ] || exit 1
+          done
+          # The shell must actually be our app, not an error page.
+          curl -s "$base/" | grep -q '<div id="root">' || { echo "root div missing"; exit 1; }
+
+  # ── 10. Deploy production (promote) ───────────────────────────────────────
+  # Candidate→promote, step 2: redeploy the SAME dist artifact to the
+  # production branch. Only reachable once the candidate smoke-tested green.
   deploy-prod:
     name: Deploy production
     runs-on: ubuntu-latest
-    # The gate: every quality job must be green before anything ships.
-    needs: [lint, e2e, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: smoke-candidate
     permissions:
       contents: read
       deployments: write
@@ -221,18 +305,16 @@ jobs:
           path: dist
 
       - name: Deploy to Cloudflare Pages (production)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=unofficial-strava-pwa --branch=main
 
-  # ── 8. Post-deploy smoke test ─────────────────────────────────────────────
-  # Verifies the live site actually serves what we shipped: the SPA shell,
-  # a deep link (exercises the SPA fallback), the manifest, and the service
-  # worker. This is the production health check — with no client telemetry
+  # ── 11. Smoke test (production) ───────────────────────────────────────────
+  # Post-activation health check on the real URL. With no client telemetry
   # (privacy promise), a failed smoke run is our uptime alarm.
-  smoke:
+  smoke-prod:
     name: Smoke test (production)
     runs-on: ubuntu-latest
     needs: deploy-prod
